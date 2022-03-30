@@ -37,7 +37,7 @@ _addon.version = '0.1.0'
 _addon.name = 'AFAC'
 _addon.author = 'Ekrividus'
 _addon.commands = {'afac'}
-_addon.lastUpdate = '8/11/2020'
+_addon.lastUpdate = '3/30/2022'
 _addon.windower = '4'
 
 require 'tables'
@@ -210,6 +210,7 @@ windower.register_event('addon command', function(...)
     elseif (T({"mp","magic","mana"}):contains(arg[1]:lower())) then
         local num = tonumber(arg[2]) or 300
         message("Convert MP threshold: "..tostring(num))
+        settings.convert_mp = num
         settings:save()
     elseif (arg[1]:lower() == "show") then
         for k, v in pairs(settings) do
