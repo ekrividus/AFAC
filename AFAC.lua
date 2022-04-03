@@ -37,7 +37,7 @@ _addon.version = '0.1.0'
 _addon.name = 'AFAC'
 _addon.author = 'Ekrividus'
 _addon.commands = {'afac'}
-_addon.lastUpdate = '8/11/2020'
+_addon.lastUpdate = '4/3/2022'
 _addon.windower = '4'
 
 require 'tables'
@@ -142,6 +142,7 @@ windower.register_event('prerender', function(...)
         player = windower.ffxi.get_player()
 
         local recasts = T(windower.ffxi.get_ability_recasts())
+        local buffs = T(windower.ffxi.get_player().buffs)
 
         time_last_check = time
 
@@ -175,18 +176,19 @@ windower.register_event('prerender', function(...)
         if (not recasts:contains(actions[action].verb)) then
             windower.send_command(cmd)
         end
-        action = action + 1
 
-        if (action >= 6 and not T(player.buffs):contains(res.buffs:with('en', "Astral Conduit").id)) then
+        if (action >= 6 and not T(buffs):contains(res.buffs:with('en', "Astral Conduit").id)) then
             running = false
             action = 0
             message("Astral Conduit Completed! Blood Pacts Complete!")
             local buff_list = ""
-            for k, v in ipairs(player.buffs) do
+            for k, v in ipairs(buffs) do
                 buff_list = buff_list..", "..res.buffs[v].en
             end
             message("Buffs: "..buff_list, true)
         end
+
+        action = action + 1
     end
 end)
 

@@ -1,5 +1,9 @@
 # Astral Flow & Astral Conduit automation tool
 
+## This is very much still alpha state. Meaning it will likely not work more than 30% of the time.
+I am currently on a break from the game and not actively developing addons. It might be awhile before this sees a truly 
+function state. Not to worry though, it is tip top on the list when I return in the spring/summer.
+
 Will use Apogee > AF > BP > Mana Cede > BP > AC > BPs  
 Will Convert when below your MP threshold  
 Will attempt to resummon the avatar for your chosen BP should it die mid AFAC  
