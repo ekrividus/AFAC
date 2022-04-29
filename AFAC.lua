@@ -64,9 +64,9 @@ defaults.blood_pact = 'Volt Strike' -- Which Blood Pact to use
 
 -- Newly added default settings
 defaults.delays = T{
-    pet=1.7,
-    ja=1.3,
-    summon=4,
+    pet=1.8,
+    ja=1.5,
+    summon=6,
 }
 
 -- Load settings/defaults
@@ -93,6 +93,8 @@ local summon_list = {
     
     ["Flaming Crush"] = "Ifrit",
     ["Meteor Stike"] = "Ifrit",
+
+    ["Hysteric Barrage"] = "Siren",
 }
 
 --[[
@@ -120,11 +122,9 @@ end
 function message(msg, debug, to_log)
     if (not debug and not to_log) then
         windower.add_to_chat(207, msg)
-    elseif (debug and settings.debug and not to_log) then
+    elseif (debug and not to_log) then
         windower.add_to_chat(207, msg)
-    elseif (to_log and not debug) then
-        log(msg)
-    elseif (to_log and debug and settings.debug) then
+    elseif (to_log) then
         log(msg)
     end
 end
@@ -135,27 +135,65 @@ end
 windower.register_event('prerender', function(...)
     local time = os.clock()
     local cmd = ""
-    delay = delay or 0
 
     if (running and (time > time_last_check + settings.frequency) and (time > time_last_check + delay)) then
-        message("Delay since last action: "..tostring(delay))
+        message("Delay from last action: "..tostring(delay).." Time since last action: "..time - time_last_check, true)
         player = windower.ffxi.get_player()
 
         local recasts = T(windower.ffxi.get_ability_recasts())
         local buffs = T(windower.ffxi.get_player().buffs)
 
+        
         time_last_check = time
 
-        action = action > 6 and 6 or action
-        local act = res.job_abilities:with('en', actions[action].verb) and res.job_abilities:with('en', actions[action].verb).recast_id or nil
-        if (actions[action].verb == "Blood Pact: Rage" or (recasts[act] == nil or recasts[act] <= 0)) then
-            action = (action >= 6 and 6 or action)
-        end
-        if (skip_afac and (action == 1 or action == 5)) then
-            action = action + 1
+        if (action >= 7 and 
+            not T(buffs):contains(res.buffs:with('en', "Apogee").id) and 
+            not T(buffs):contains(res.buffs:with('en', "Astral Conduit").id) and 
+            not T(buffs):contains(res.buffs:with('en', "Astral Flow").id)) then
+                
+            running = false
+            action = 0
+            delay = 0
+            message("Astral Conduit Completed! Blood Pacts Complete!")
+            
+            local buff_list = ""
+            for k, v in ipairs(buffs) do
+                buff_list = buff_list..", "..res.buffs[v].en
+            end
+            message("Buffs: "..buff_list, true)
+            return
         end
 
-        if (action >= 6 and recasts[res.job_abilities:with('en', "Convert").recast_id] and recasts[res.job_abilities:with('en', "Convert").recast_id] == 0 and player.vitals.convert_mp < settings.convert_mp) then
+        action = action > 6 and 6 or action
+        local action_id = res.job_abilities:with('en', actions[action].verb) and res.job_abilities:with('en', actions[action].verb).recast_id or nil
+        message(actions[action].verb.." Recast ID: "..action_id, true)
+        if (skip_afac and (action == 1 or action == 5)) then
+            action = action + 1
+            return
+        end
+
+        -- Wait for AC and BP CDs, bugout if AF is on CD, skip Apogee and Mana Cede
+        if (recasts[action_id] and recasts[action_id] > 0) then
+            message(actions[action].verb.." is on CD for "..recasts[action_id].." seconds. Should we try again or just skip it?", true)
+            if (recasts[action_id] and recasts[action_id] > 0 and actions[action].verb == "Astral Flow") then
+                delay = 0
+                running = false
+                return
+            elseif (recasts[action_id] and recasts[action_id] > 0 and actions[action].verb == "Astral Conduit") then
+                delay = recasts[action_id] - (settings.frequency * 2)
+                return
+            elseif (recasts[action_id] and recasts[action_id] > 0 and action <= 7 and actions[action].verb == "Blood Pact: Rage") then
+                delay = recasts[action_id] - (settings.frequency * 2)
+                return
+            end
+            delay = 0.5
+            action = action + 1
+            return
+        end
+
+        if (action >= 6 and recasts[res.job_abilities:with('en', "Convert").recast_id] and 
+            recasts[res.job_abilities:with('en', "Convert").recast_id] == 0 and 
+            player.vitals.mp < settings.convert_mp) then
             cmd = "input /ja \"Convert\" <me>"
             delay = settings.delays.ja
         elseif (actions[action].verb ~= "Blood Pact: Rage") then
@@ -163,7 +201,7 @@ windower.register_event('prerender', function(...)
             delay = settings.delays[actions[action].type]
         elseif (actions[action].verb == "Blood Pact: Rage") then
             local pet = windower.ffxi.get_mob_by_target("pet")
-            if (not pet or pet.hpp == 0) then
+            if (not pet or pet.hpp <= 0) then
                 cmd = "input /ma \""..summon_list[settings.blood_pact]
                 action = action >= 6 and 6 or action - 1
                 delay = settings.delays.summon
@@ -173,19 +211,10 @@ windower.register_event('prerender', function(...)
             end
         end
         
-        if (not recasts:contains(actions[action].verb)) then
-            windower.send_command(cmd)
-        end
+        local target = windower.ffxi.get_mob_by_target("t")
 
-        if (action >= 6 and not T(buffs):contains(res.buffs:with('en', "Astral Conduit").id)) then
-            running = false
-            action = 0
-            message("Astral Conduit Completed! Blood Pacts Complete!")
-            local buff_list = ""
-            for k, v in ipairs(buffs) do
-                buff_list = buff_list..", "..res.buffs[v].en
-            end
-            message("Buffs: "..buff_list, true)
+        if (not recasts:contains(action_id)) then
+            windower.send_command(cmd)
         end
 
         action = action + 1
@@ -195,9 +224,11 @@ end)
 windower.register_event('addon command', function(...)
     if (T({"start","go","on"}):contains(arg[1]:lower())) then
         message("AF + AC Starting!")
+        delay = 0
         running = true
     elseif (T({"stop","end","off"}):contains(arg[1]:lower())) then
         message("AF + AC Stopping!")
+        delay = 0
         running = false
     elseif (T{"bp","use","bloodpact"}):contains(arg[1]:lower()) then
         local pact = title_case(T(arg):slice(2,#arg):concat(" "))
